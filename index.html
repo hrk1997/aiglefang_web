@@ -1,45 +1,481 @@
 <!DOCTYPE html>
-<html lang="en" dir="ltr">
-  <head>
-    <meta charset="utf-8">
-    <title></title>
-    <link rel="shortcut icon" type="image/png" href="photo/tittle01.png">
-    <link rel="stylesheet" href="index.css">
-  </head>
-  <body>
-   <header>
-     <img class="logo" src="photo/tittle01.png" alt="logo">
-     <nav>
-       <ul class="nav_links">
-          <li><a href="contact.html">contact</a></li>
-          <li><a href="projects.html">Projects</a></li>
-          
-       </ul>
-     </nav>
-     <a class="cta" href="places.html"><button>TRADING</button></a>
-     <a class="cta" href="places.html"><button>TECH</button></a>
-   </header>
-   <div class="mid">
-     <h1>AIGLE FANG </h1>
-     <div class="trade">
-     <h2>TRADING ::</h2>
-     <p>It mainly focus on the money making area.<br>
-    DAY TRAING<br>
-    INVESTING<br>
-    </p>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>General HVACR Invoice</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Load a professional font like Playfair Display and Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;700;900&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        /* Custom styles for printing and branding */
+        .font-logo { font-family: 'Playfair Display', serif; }
+        .font-sans-alt { font-family: 'Inter', sans-serif; }
+        
+        /* Define the primary brand color for the logo */
+        .text-brand-green { color: rgb(38, 76, 54); } /* Updated to new RGB green */
+        .border-ink { border-color: #333; }
+        
+        /* Hide buttons and input fields when printing */
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background-color: white !important;
+                padding: 0 !important;
+            }
+            .invoice-container {
+                box-shadow: none !important;
+                border: none !important;
+                margin: 0 !important;
+                padding: 0 !important;
+                max-width: none !important;
+                width: 100%;
+            }
+            /* Note: We cannot control browser-added headers/footers (title, date/path). 
+               The user must choose 'None' or 'Omit headers/footers' in their print dialog. */
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'brand-green': 'rgb(38, 76, 54)', /* Updated to new RGB green */
+                    }
+                }
+            }
+        }
+
+        // --- Core Invoice Logic ---
+        
+        const INVOICE_ITEMS_KEY = 'hvacr_invoice_items';
+        const CUSTOMER_DETAILS_KEY = 'hvacr_customer_details';
+        const INVOICE_CONFIG_KEY = 'hvacr_invoice_config';
+        
+        let items = [];
+        let customerDetails = {
+            name: 'yummy restaurant', // Default
+            address: 'ulliyeri' // Default
+        };
+        let invoiceConfig = {
+            invoiceNumber: '005', // Default from image
+            invoiceDate: '' // Will be set to today's date on first load
+        };
+
+        // Utility to format currency
+        const formatter = new Intl.NumberFormat('en-IN', {
+            style: 'currency',
+            currency: 'INR',
+            minimumFractionDigits: 0,
+            maximumFractionDigits: 0,
+        });
+
+        // Helper function to format date from 'YYYY-MM-DD' (input value) to '29 Sep 2025' (display value)
+        function formatDateForDisplay(dateString) {
+            if (!dateString) return '';
+            try {
+                const date = new Date(dateString + 'T00:00:00'); // Use T00:00:00 to prevent timezone shift issues
+                const dateOptions = { day: '2-digit', month: 'short', year: 'numeric' };
+                return date.toLocaleDateString('en-US', dateOptions).replace(/,/g, '');
+            } catch (e) {
+                return dateString;
+            }
+        }
+
+        // Function to load all data from storage
+        function loadData() {
+            // Load Items
+            try {
+                const storedItems = localStorage.getItem(INVOICE_ITEMS_KEY);
+                if (storedItems) {
+                    items = JSON.parse(storedItems);
+                }
+            } catch (e) {
+                console.error("Could not load items from storage:", e);
+                items = [];
+            }
+
+            // Load Customer Details
+            try {
+                const storedDetails = localStorage.getItem(CUSTOMER_DETAILS_KEY);
+                if (storedDetails) {
+                    customerDetails = JSON.parse(storedDetails);
+                }
+            } catch (e) {
+                console.error("Could not load customer details:", e);
+            }
+
+            // Load Invoice Config
+            try {
+                const storedConfig = localStorage.getItem(INVOICE_CONFIG_KEY);
+                if (storedConfig) {
+                    invoiceConfig = JSON.parse(storedConfig);
+                }
+            } catch (e) {
+                console.error("Could not load invoice config:", e);
+            }
+        }
+
+        // Function to save items to storage
+        function saveItems() {
+            localStorage.setItem(INVOICE_ITEMS_KEY, JSON.stringify(items));
+        }
+        
+        // Function to save customer details
+        function saveCustomerDetails() {
+            localStorage.setItem(CUSTOMER_DETAILS_KEY, JSON.stringify(customerDetails));
+        }
+
+        // Function to save invoice configuration
+        function saveConfig() {
+            localStorage.setItem(INVOICE_CONFIG_KEY, JSON.stringify(invoiceConfig));
+        }
+
+        // Function to update the Billed To display and storage
+        function updateBilledTo() {
+            const nameInput = document.getElementById('customer-name');
+            const addressInput = document.getElementById('customer-address');
+            
+            // 1. Update internal state
+            customerDetails.name = nameInput.value.trim();
+            customerDetails.address = addressInput.value.trim();
+
+            // 2. Save to storage
+            saveCustomerDetails();
+
+            // 3. Update display area
+            const displayEl = document.getElementById('billed-to-info');
+            
+            let displayText = customerDetails.name;
+            if (customerDetails.name && customerDetails.address) {
+                displayText = `${customerDetails.name}, ${customerDetails.address}`;
+            } else if (!customerDetails.name && customerDetails.address) {
+                displayText = customerDetails.address;
+            }
+
+            // Fallback text if everything is empty
+            displayEl.textContent = displayText || 'Enter Customer Name and Address above';
+        }
+        
+        // Function to update the Invoice Number and Date display and storage
+        function updateInvoiceInfo() {
+            const numberInput = document.getElementById('invoice-number-input');
+            const dateInput = document.getElementById('invoice-date-input');
+
+            // 1. Update internal state
+            invoiceConfig.invoiceNumber = numberInput.value.trim();
+            invoiceConfig.invoiceDate = dateInput.value.trim();
+
+            // 2. Save to storage
+            saveConfig();
+
+            // 3. Update display area (for printing)
+            document.getElementById('invoice-number-display').textContent = invoiceConfig.invoiceNumber || 'N/A';
+            document.getElementById('invoice-date-display').textContent = formatDateForDisplay(invoiceConfig.invoiceDate);
+        }
+
+        // Function to add a new item
+        function addItem() {
+            const itemName = document.getElementById('new-item-name').value.trim();
+            const quantity = parseInt(document.getElementById('new-item-quantity').value);
+            const unitPrice = parseFloat(document.getElementById('new-item-price').value);
+
+            // Basic validation
+            if (!itemName) {
+                alertModal("Please enter an Item Name.");
+                return;
+            }
+            if (isNaN(quantity) || quantity <= 0) {
+                alertModal("Please enter a valid Quantity (must be > 0).");
+                return;
+            }
+            if (isNaN(unitPrice) || unitPrice < 0) {
+                alertModal("Please enter a valid Unit Price (must be >= 0).");
+                return;
+            }
+
+            const total = quantity * unitPrice;
+            
+            items.push({
+                name: itemName,
+                quantity: quantity,
+                unitPrice: unitPrice,
+                total: total
+            });
+
+            // Clear inputs
+            document.getElementById('new-item-name').value = '';
+            document.getElementById('new-item-quantity').value = 1;
+            document.getElementById('new-item-price').value = '';
+
+            saveItems();
+            renderInvoice();
+        }
+
+        // Function to remove an item
+        function removeItem(index) {
+            items.splice(index, 1);
+            saveItems();
+            renderInvoice();
+        }
+
+        // Function to calculate and render the entire invoice
+        function renderInvoice() {
+            const itemsContainer = document.getElementById('invoice-items');
+            let grandTotal = 0;
+            
+            itemsContainer.innerHTML = ''; // Clear existing items
+
+            // The hardcoded "Hitachi split and cassette" line has been removed.
+
+            items.forEach((item, index) => {
+                grandTotal += item.total;
+
+                const row = document.createElement('div');
+                // Added a separator for the first priced item
+                // This will apply the top border to the very first item added (index 0)
+                const borderClass = index === 0 ? 'border-t border-gray-300' : ''; 
+                row.className = `grid grid-cols-4 font-sans-alt text-sm sm:text-base ${borderClass} py-3`;
+                
+                // Item Name
+                const nameCell = document.createElement('div');
+                nameCell.className = 'col-span-1 pr-2'; 
+                nameCell.innerHTML = `<span class="text-ink font-semibold">${item.name}</span>`;
+                
+                // Quantity Cell
+                const qtyCell = document.createElement('div');
+                qtyCell.className = 'col-span-1 text-right sm:text-center pr-2 sm:pr-0';
+                qtyCell.textContent = item.quantity;
+                
+                // Unit Price Cell
+                const unitPriceCell = document.createElement('div');
+                unitPriceCell.className = 'col-span-1 text-right pr-2';
+                unitPriceCell.textContent = formatter.format(item.unitPrice).replace('₹', '');
+                
+                // Total Cell with remove button
+                const totalCell = document.createElement('div');
+                totalCell.className = 'col-span-1 text-right flex justify-end items-center space-x-2';
+                totalCell.innerHTML = `
+                    <span class="font-bold">${formatter.format(item.total).replace('₹', '')}</span>
+                    <button onclick="removeItem(${index})" class="no-print text-red-500 hover:text-red-700 text-lg leading-none p-1 rounded-full hover:bg-red-50 transition-colors" title="Remove Item">&times;</button>
+                `;
+
+                row.appendChild(nameCell);
+                row.appendChild(qtyCell);
+                row.appendChild(unitPriceCell);
+                row.appendChild(totalCell);
+
+                itemsContainer.appendChild(row);
+            });
+            
+            // Update the bill total in the final section
+            document.getElementById('final-bill-total').textContent = `${formatter.format(grandTotal).replace('₹', '')} Rs`;
+        }
+
+        // Function to print the invoice
+        function printInvoice() {
+            window.print();
+        }
+
+        // Simple custom modal function to replace alert()
+        function alertModal(message) {
+            const modal = document.getElementById('custom-alert-modal');
+            const messageEl = document.getElementById('alert-message');
+            
+            messageEl.textContent = message;
+            modal.classList.remove('hidden');
+
+            // Automatically hide after 3 seconds
+            setTimeout(() => {
+                modal.classList.add('hidden');
+            }, 3000);
+        }
+
+        // Initial setup on window load
+        window.onload = function() {
+            loadData(); // Load all data
+
+            // If items are empty, load the original example data (since the unpriced line is gone)
+            if (items.length === 0) {
+                items = [
+                    { name: "Water Service and Repair", quantity: 2, unitPrice: 1500, total: 3000 },
+                    { name: "Gas Refilling", quantity: 2, unitPrice: 2500, total: 5000 }
+                ];
+                saveItems();
+            }
+            
+            // Set today's date if invoiceDate is empty (first run or cleared)
+            if (!invoiceConfig.invoiceDate) {
+                 const today = new Date().toISOString().split('T')[0]; // Format YYYY-MM-DD
+                 invoiceConfig.invoiceDate = today;
+                 saveConfig();
+            }
+
+            // Set initial values in the customer input fields
+            document.getElementById('customer-name').value = customerDetails.name;
+            document.getElementById('customer-address').value = customerDetails.address;
+            
+            // Set initial values in the invoice info input fields
+            document.getElementById('invoice-number-input').value = invoiceConfig.invoiceNumber;
+            document.getElementById('invoice-date-input').value = invoiceConfig.invoiceDate;
+
+            // Render the initial display and items
+            updateBilledTo();
+            updateInvoiceInfo(); // Call this to set the display text from the config
+            renderInvoice();
+        };
+    </script>
+</head>
+
+<body class="bg-gray-50 min-h-screen p-4 sm:p-8 font-sans-alt">
+
+    <!-- Custom Alert Modal (Replaces alert()) -->
+    <div id="custom-alert-modal" class="hidden fixed top-0 left-0 w-full h-full bg-black bg-opacity-50 flex items-center justify-center z-50 transition-opacity duration-300">
+        <div class="bg-white p-6 rounded-lg shadow-2xl max-w-sm w-full text-center border-t-4 border-red-500">
+            <p id="alert-message" class="text-lg font-semibold text-gray-800"></p>
+        </div>
     </div>
-    <div class="tech">
-     <h2>TECH</h2>
-     <p>It mainly focus on programing and operating sytems.<br>
-        python<br>
-        linux<br>
-        web-development<br>
-        git<br>
-     </p>
-     </div>
-     <div class="footer">
-         <h3>website under updation.........</h3>
-     </div>
+
+    <!-- Main Invoice Container -->
+    <div class="invoice-container max-w-3xl mx-auto bg-white p-6 sm:p-10 shadow-lg border-2 border-gray-100 rounded-lg">
+
+        <!-- Header: Logo and Details -->
+        <header class="text-center mb-10">
+            <h1 class="text-4xl sm:text-5xl font-extrabold font-logo text-brand-green tracking-wider">GENERAL HVACR</h1>
+            <p class="text-xs font-sans-alt text-gray-700 tracking-widest mt-1">ESTD 1997</p>
+            <p class="text-base sm:text-lg font-sans-alt text-gray-800 mt-2">puthoorvattam, balussery</p>
+            <p class="text-xl sm:text-2xl font-bold font-logo text-gray-900 tracking-widest mt-4 border-b border-gray-300 inline-block px-4 pb-1">INVOICE</p>
+        </header>
+        
+        <!-- INVOICE DETAILS INPUT (No Print) -->
+        <div class="no-print mt-6 mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-bold mb-3 text-brand-green">Edit Invoice Info</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="invoice-number-input" class="block text-xs font-medium text-gray-700">Invoice Number</label>
+                    <input type="text" id="invoice-number-input" oninput="updateInvoiceInfo()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-brand-green focus:border-brand-green font-sans-alt" placeholder="e.g., 006">
+                </div>
+                <div>
+                    <label for="invoice-date-input" class="block text-xs font-medium text-gray-700">Invoice Date</label>
+                    <input type="date" id="invoice-date-input" onchange="updateInvoiceInfo()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-brand-green focus:border-brand-green font-sans-alt">
+                </div>
+            </div>
+        </div>
+
+        <!-- Customer Details Input (No Print) -->
+        <div class="no-print mt-6 mb-8 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-bold mb-3 text-brand-green">Edit Customer Details</h3>
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                    <label for="customer-name" class="block text-xs font-medium text-gray-700">Customer Name</label>
+                    <input type="text" id="customer-name" oninput="updateBilledTo()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-brand-green focus:border-brand-green font-sans-alt" placeholder="e.g., Yummy Restaurant">
+                </div>
+                <div>
+                    <label for="customer-address" class="block text-xs font-medium text-gray-700">Customer Address/Location</label>
+                    <input type="text" id="customer-address" oninput="updateBilledTo()" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-brand-green focus:border-brand-green font-sans-alt" placeholder="e.g., Ulliyeri, Calicut">
+                </div>
+            </div>
+        </div>
+
+        <!-- Billing and Invoice Info -->
+        <div class="flex justify-between items-start mb-8 text-sm sm:text-base">
+            <div>
+                <p class="uppercase font-bold text-gray-700">BILLED TO:</p>
+                <div id="billed-to-info" class="text-gray-900 text-lg font-semibold mt-1">
+                    <!-- Customer details are inserted here by JS -->
+                </div>
+            </div>
+            <div class="text-right font-sans-alt">
+                <p class="font-semibold">Invoice No. <span id="invoice-number-display">005</span></p>
+                <p id="invoice-date-display" class="text-gray-700"></p>
+            </div>
+        </div>
+
+        <!-- Item Table Header -->
+        <div class="grid grid-cols-4 font-bold text-gray-700 uppercase tracking-wider text-xs sm:text-sm border-b border-ink py-3">
+            <div class="col-span-1">Item</div>
+            <div class="col-span-1 text-right sm:text-center">Quantity</div>
+            <div class="col-span-1 text-right">Unit Price</div>
+            <div class="col-span-1 text-right">Total</div>
+        </div>
+
+        <!-- Invoice Items List (Dynamic content generated by JS) -->
+        <div id="invoice-items" class="min-h-[150px]">
+            <!-- Items will be inserted here by JavaScript -->
+        </div>
+
+        <!-- Item Input Form (No Print) -->
+        <div class="no-print mt-6 p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <h3 class="text-lg font-bold mb-3 text-brand-green">Add New Item</h3>
+            <div class="grid grid-cols-4 gap-4 items-end">
+                <div class="col-span-4 sm:col-span-1">
+                    <label for="new-item-name" class="block text-xs font-medium text-gray-700">Item Name/Description</label>
+                    <input type="text" id="new-item-name" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-brand-green focus:border-brand-green font-sans-alt" placeholder="e.g., Compressor replacement">
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                    <label for="new-item-quantity" class="block text-xs font-medium text-gray-700">Qty</label>
+                    <input type="number" id="new-item-quantity" value="1" min="1" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-brand-green focus:border-brand-green text-right font-sans-alt">
+                </div>
+                <div class="col-span-2 sm:col-span-1">
+                    <label for="new-item-price" class="block text-xs font-medium text-gray-700">Unit Price (₹)</label>
+                    <input type="number" id="new-item-price" min="0" class="mt-1 block w-full rounded-md border-gray-300 shadow-sm p-2 border focus:ring-brand-green focus:border-brand-green text-right font-sans-alt" placeholder="0.00">
+                </div>
+                <div class="col-span-4 sm:col-span-1">
+                    <button onclick="addItem()" class="w-full bg-brand-green text-white py-2 px-4 rounded-md hover:bg-green-700 transition duration-150 shadow-md font-bold text-sm">
+                        + Add Item
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Total Section -->
+        <div class="flex justify-end mt-8 border-t border-ink pt-6">
+            <div class="text-right w-full sm:w-1/2">
+                <div class="flex justify-between items-center text-2xl sm:text-3xl font-bold">
+                    <span class="uppercase">Total</span>
+                    <span id="final-bill-total" class="text-brand-green">8000 Rs</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Payment Information & Footer -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-10 border-t border-gray-400 pt-6">
+            
+            <!-- Payment Info -->
+            <div class="font-sans-alt">
+                <h3 class="uppercase font-bold text-gray-700 mb-3 text-sm tracking-wide">PAYMENT INFORMATION</h3>
+                <p class="font-semibold mb-2">Federal Bank</p>
+                <p class="text-sm">Account Name : Govindan</p>
+                <p class="text-sm">Account No : 19550100198608</p>
+                <p class="text-sm">IFSC Code : FDRL0001955</p>
+                <p class="text-sm">GOPI : 9562827570</p>
+            </div>
+
+            <!-- QR Codes and Final Total -->
+            <div class="flex flex-col items-center sm:items-end justify-end">
+                <div class="flex space-x-4 mb-4">
+                    <!-- Placeholder QR Code 1 (using a simple placeholder) -->
+                    <img src="https://placehold.co/100x100/333/fff?text=QR+Code+1" alt="Payment QR Code 1" class="w-20 h-20 rounded-sm">
+                    <!-- Placeholder QR Code 2 -->
+                    <img src="https://placehold.co/100x100/333/fff?text=QR+Code+2" alt="Payment QR Code 2" class="w-20 h-20 rounded-sm">
+                </div>
+            </div>
+        </div>
+
+        <div class="text-center mt-12">
+            <p class="text-2xl font-logo font-bold tracking-wider">Thank you!</p>
+        </div>
+
+        <!-- Print Button (No Print) -->
+        <div class="no-print flex justify-center mt-8">
+            <button onclick="printInvoice()" class="bg-blue-600 text-white py-3 px-8 rounded-lg shadow-xl hover:bg-blue-700 transition duration-150 font-bold text-lg">
+                Print/Save PDF Invoice
+            </button>
+        </div>
+        
     </div>
-    </body>
+</body>
 </html>
